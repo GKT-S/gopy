@@ -106,26 +106,26 @@ chmod +x build_release.sh
 
 ## 🎮 Usage
 
-### ⚠️ İlk Çalıştırma ve Güvenlik Onayı
+### ⚠️ First Run & Security Approval
 
-Gopy, App Store dışından dağıtıldığı için, macOS'in **Gatekeeper** güvenlik mekanizması ilk açılışta uygulamanın "doğrulanamadığını" belirten bir uyarı gösterebilir. Bu, beklenen ve normal bir durumdur.
+Since Gopy is distributed outside the App Store, the macOS **Gatekeeper** security feature may show a warning on the first launch stating that the app "cannot be verified." This is expected and normal behavior.
 
-Uygulamayı çalıştırmak için aşağıdaki yöntemlerden birini **sadece bir kereliğine** uygulamanız yeterlidir:
+To run the application, you only need to use one of the following methods **once**:
 
-#### Yöntem 1: Sağ Tıklayarak Açma (Önerilen Yöntem)
-1.  Uygulamayı `Applications` (Uygulamalar) klasöründe bulun.
-2.  `Gopy.app` ikonuna **sağ tıklayın** (veya klavyeden `Control` tuşuna basılı tutarak tıklayın).
-3.  Açılan menüden **"Aç" (Open)** seçeneğini seçin.
-4.  Karşınıza tekrar bir uyarı penceresi çıkacak. Bu pencerede bulunan **"Aç" (Open)** butonuna tıklayın.
+#### Method 1: Right-Click to Open (Recommended)
+1.  Locate the app in your `Applications` folder.
+2.  **Right-click** on the `Gopy.app` icon (or hold down the `Control` key and click).
+3.  Select **"Open"** from the context menu.
+4.  A warning dialog will appear again. This time, click the **"Open"** button in that window.
 
-Bu işlemden sonra macOS, Gopy'ye güvendiğinizi anlayacak ve bir daha bu uyarıyı göstermeyecektir.
+After this process, macOS will trust Gopy, and you won't see this warning again.
 
-#### Yöntem 2: Terminal Komutu (Alternatif Yöntem)
-Eğer isterseniz, Terminal'i açıp aşağıdaki komutu yapıştırarak uygulamanın güvenlik etiketini kalıcı olarak kaldırabilirsiniz:
+#### Method 2: Terminal Command (Alternative)
+If you prefer, you can open the Terminal and paste the following command to permanently remove the app's security quarantine flag:
 ```bash
 xattr -d com.apple.quarantine /Applications/Gopy.app
 ```
-Bu komutu çalıştırdıktan sonra uygulamaya normal şekilde çift tıklayarak açabilirsiniz.
+After running this command, you can open the app by double-clicking it normally.
 
 ### Basic Usage
 1. **Launch Gopy** - Click the "G" icon in the menu bar
