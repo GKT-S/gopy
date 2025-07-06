@@ -21,6 +21,7 @@ jobs:
         
     - name: Build Release
       run: |
+        # 1. Projeyi release için standart yöntem olan 'archive' ile arşivle
         xcodebuild -project Gopy.xcodeproj \
           -scheme Gopy \
           -configuration Release \
@@ -28,18 +29,16 @@ jobs:
           -archivePath ./build/Gopy.xcarchive \
           archive
         
-        # Create build directory
-        mkdir -p build
+        # 2. Gopy.app'in bulunduğu dizine geçerek zip dosyasını oluştur
+        # Bu, zip içinde gereksiz klasör yapılarının olmasını engeller
+        cd build/Gopy.xcarchive/Products/Applications
+        zip -r "${{ github.workspace }}/build/Gopy-${{ github.ref_name }}.zip" "Gopy.app"
         
-        # Copy app
-        cp -R "./DerivedData/Build/Products/Release/Gopy.app" "./build/"
-        
-        # Create zip
-        cd build
-        zip -r "Gopy-${GITHUB_REF#refs/tags/}.zip" "Gopy.app"
-        
-        # Create checksum
-        shasum -a 256 "Gopy-${GITHUB_REF#refs/tags/}.zip" > "Gopy-${GITHUB_REF#refs/tags/}.zip.sha256"
+        # 3. Ana dizine geri dön
+        cd "${{ github.workspace }}"
+
+        # 4. Oluşturulan zip dosyası için checksum yarat
+        shasum -a 256 "build/Gopy-${{ github.ref_name }}.zip" > "build/Gopy-${{ github.ref_name }}.zip.sha256"
         
     - name: Create Release
       uses: softprops/action-gh-release@v1
