@@ -59,7 +59,7 @@ curl -fsSL https://raw.githubusercontent.com/GKT-S/gopy/main/install.sh | bash
 ```
 
 #### 2. **Manual Download** 📦
-1. Download the latest version from [Releases page](https://github.com/yourusername/gopy/releases)
+1. Download the latest version from [Releases page](https://github.com/GKT-S/gopy/releases)
 2. Extract the `Gopy.zip` file
 3. Drag `Gopy.app` to your `Applications` folder
 4. Launch Gopy
