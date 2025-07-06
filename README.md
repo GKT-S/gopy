@@ -64,12 +64,6 @@ curl -fsSL https://raw.githubusercontent.com/GKT-S/gopy/main/install.sh | bash
 3. Drag `Gopy.app` to your `Applications` folder
 4. Launch Gopy
 
-#### 3. **Homebrew Installation** 🍺
-```bash
-# Coming soon
-brew install --cask gopy
-```
-
 ### 🔧 Developer Setup
 
 #### Requirements
