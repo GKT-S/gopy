@@ -162,3 +162,40 @@ Gopy uses an intelligent memory management system for performance and storage ba
 
 ### Project Structure
 ```
+Gopy/
+├── Gopy/
+│   ├── GopyApp.swift          # Main application file
+│   ├── ContentView.swift      # Main interface
+│   ├── ClipboardManager.swift # Clipboard management
+│   ├── ClipboardItem.swift    # Data model
+│   ├── SettingsView.swift     # Settings interface
+│   └── Assets.xcassets/       # Application resources
+├── GopyTests/                 # Unit tests
+├── GopyUITests/               # UI tests
+└── run_gopy.sh               # Quick launch script
+```
+
+### Contributing
+Contributions are welcome! Please read the [Contributing Guide](CONTRIBUTING.md) for details on how to submit pull requests, report bugs, and suggest features.
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Apple SwiftUI team for the amazing framework
+- The macOS developer community for inspiration and support
+- All beta testers for their valuable feedback
+
+---
+
+⭐ If you find this project useful, please consider giving it a star!
+
+📧 For questions or support, please open an issue or contact [goktgsahin@gmail.com](mailto:goktgsahin@gmail.com).
