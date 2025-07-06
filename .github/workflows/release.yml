@@ -1,0 +1,82 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: '15.0'
+        
+    - name: Build Release
+      run: |
+        xcodebuild -project Gopy.xcodeproj \
+          -scheme Gopy \
+          -configuration Release \
+          -derivedDataPath ./DerivedData \
+          -archivePath ./build/Gopy.xcarchive \
+          archive
+        
+        # Create build directory
+        mkdir -p build
+        
+        # Copy app
+        cp -R "./DerivedData/Build/Products/Release/Gopy.app" "./build/"
+        
+        # Create zip
+        cd build
+        zip -r "Gopy-${GITHUB_REF#refs/tags/}.zip" "Gopy.app"
+        
+        # Create checksum
+        shasum -a 256 "Gopy-${GITHUB_REF#refs/tags/}.zip" > "Gopy-${GITHUB_REF#refs/tags/}.zip.sha256"
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: |
+          build/Gopy-*.zip
+          build/Gopy-*.zip.sha256
+        body: |
+          ## 📋 Gopy ${{ github.ref_name }}
+          
+          ### 🚀 Kurulum
+          
+          #### Otomatik Kurulum (Önerilen)
+          ```bash
+          curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash
+          ```
+          
+          #### Manuel Kurulum
+          1. Aşağıdaki `Gopy-${{ github.ref_name }}.zip` dosyasını indirin
+          2. Zip dosyasını açın
+          3. `Gopy.app` dosyasını `Applications` klasörüne sürükleyin
+          4. Gopy'yi çalıştırın
+          
+          ### 🔧 İlk Çalıştırma
+          - Sistem Tercihleri → Güvenlik → Erişilebilirlik
+          - Gopy'yi etkinleştirin
+          - Menu bar'da "G" ikonuna tıklayarak kullanın
+          
+          ### 📋 Checksum Doğrulama
+          ```bash
+          shasum -a 256 -c Gopy-${{ github.ref_name }}.zip.sha256
+          ```
+          
+          ### 🐛 Sorun Bildirimi
+          Herhangi bir sorunla karşılaşırsanız [Issues](https://github.com/${{ github.repository }}/issues) sayfasında bildirin.
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
