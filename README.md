@@ -106,6 +106,27 @@ chmod +x build_release.sh
 
 ## 🎮 Usage
 
+### ⚠️ İlk Çalıştırma ve Güvenlik Onayı
+
+Gopy, App Store dışından dağıtıldığı için, macOS'in **Gatekeeper** güvenlik mekanizması ilk açılışta uygulamanın "doğrulanamadığını" belirten bir uyarı gösterebilir. Bu, beklenen ve normal bir durumdur.
+
+Uygulamayı çalıştırmak için aşağıdaki yöntemlerden birini **sadece bir kereliğine** uygulamanız yeterlidir:
+
+#### Yöntem 1: Sağ Tıklayarak Açma (Önerilen Yöntem)
+1.  Uygulamayı `Applications` (Uygulamalar) klasöründe bulun.
+2.  `Gopy.app` ikonuna **sağ tıklayın** (veya klavyeden `Control` tuşuna basılı tutarak tıklayın).
+3.  Açılan menüden **"Aç" (Open)** seçeneğini seçin.
+4.  Karşınıza tekrar bir uyarı penceresi çıkacak. Bu pencerede bulunan **"Aç" (Open)** butonuna tıklayın.
+
+Bu işlemden sonra macOS, Gopy'ye güvendiğinizi anlayacak ve bir daha bu uyarıyı göstermeyecektir.
+
+#### Yöntem 2: Terminal Komutu (Alternatif Yöntem)
+Eğer isterseniz, Terminal'i açıp aşağıdaki komutu yapıştırarak uygulamanın güvenlik etiketini kalıcı olarak kaldırabilirsiniz:
+```bash
+xattr -d com.apple.quarantine /Applications/Gopy.app
+```
+Bu komutu çalıştırdıktan sonra uygulamaya normal şekilde çift tıklayarak açabilirsiniz.
+
 ### Basic Usage
 1. **Launch Gopy** - Click the "G" icon in the menu bar
 2. **Copy content** - Copy any text (Cmd+C)
@@ -143,86 +164,7 @@ Gopy uses an intelligent memory management system for performance and storage ba
 - Use the favorites system for code snippets, passwords, frequently used texts
 - Add notes to important information to store context
 
-
-
 ## 🏗️ Development
 
 ### Project Structure
 ```
-Gopy/
-├── Gopy/
-│   ├── GopyApp.swift          # Main application file
-│   ├── ContentView.swift      # Main interface
-│   ├── ClipboardManager.swift # Clipboard management
-│   ├── ClipboardItem.swift    # Data model
-│   ├── SettingsView.swift     # Settings interface
-│   └── Assets.xcassets/       # Application resources
-├── GopyTests/                 # Unit tests
-├── GopyUITests/               # UI tests
-└── run_gopy.sh               # Quick launch script
-```
-
-### Contributing
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-### Code Style
-- Use standard Swift code style for Swift code
-- Follow SwiftUI best practices
-- Write unit tests for every new feature
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**App won't start**
-- Make sure Gopy.entitlements file is configured correctly
-- Check macOS security settings
-
-**Clipboard not being tracked**
-- Check the app's privacy permissions
-- System Preferences → Security & Privacy → Privacy → Accessibility
-
-**Icon not visible in menu bar**
-- Restart the application
-- Check system tray settings
-
-## 📖 Version History
-
-### v1.0.0 (Current)
-- ✅ Basic clipboard management
-- ✅ Smart categorization
-- ✅ Favorites system
-- ✅ Search functionality
-- ✅ Note-taking
-- ✅ Menu bar integration
-
-### Planned Features
-- 🔄 Synchronization (iCloud)
-- 🔐 Encryption support
-- 🎨 Theme customization
-- 📱 iOS companion app
-- 🌍 Multi-language support
-
-## 🤝 Contributors
-
-This project is developed by [Göktuğ Şahin](https://github.com/GKT-S).
-
-## 📄 License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Apple SwiftUI team for the amazing framework
-- macOS developer community for inspiration
-- All beta testers for their feedback
-
----
-
-⭐ If you like this project, please don't forget to give it a star!
-
-📧 For questions: [goktgsahin@gmail.com](mailto:goktgsahin@gmail.com) 
