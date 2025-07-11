@@ -14,6 +14,33 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - iOS companion app
 - Multi-language support
 
+## [1.1.0] - 2025-01-11
+
+### Added Features
+- ✅ Screenshot support (Images category)
+- ✅ Image thumbnail display in clipboard items
+- ✅ Automatic screenshot detection from clipboard
+- ✅ Support for multiple image formats (PNG, TIFF, PDF)
+- ✅ Image copying back to clipboard functionality
+
+### Improvements
+- 🔧 Code cleanup and comment removal for production
+- 🔧 Optimized clipboard monitoring for both text and images
+- 🔧 Enhanced content analysis for image items
+- 🔧 Improved UI for image items with thumbnail preview
+
+### Technical Details
+- Added support for `public.png`, `public.tiff`, and other image formats
+- Enhanced ClipboardItem model to handle both text and image data
+- Custom Codable implementation to exclude large image data from UserDefaults
+- Improved pasteboard monitoring with multiple format detection
+
+### Usage Notes
+- Screenshots work with Cmd+Control+Shift+3/4 (copies to clipboard)
+- Regular Cmd+Shift+3/4 only saves files, not detected by Gopy
+- Images appear with 📷 icon and thumbnail preview
+- All image operations (copy, favorite, notes) work like text items
+
 ## [1.0.0] - 2025-01-XX
 
 ### Added Features
@@ -62,12 +89,25 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## Release Notes
 
+### v1.1.0 Screenshot Support Update
+This release adds comprehensive screenshot support to Gopy. Screenshots are automatically detected and categorized when copied to clipboard using the correct keyboard shortcuts.
+
+**New Features:**
+- Screenshot detection and categorization
+- Image thumbnail previews
+- Support for multiple image formats
+- Image copying functionality
+
+**Important Usage Notes:**
+- Use Cmd+Control+Shift+3 (full screen) or Cmd+Control+Shift+4 (selection) for screenshots
+- These shortcuts copy images to clipboard AND save files
+- Regular Cmd+Shift+3/4 only save files and won't be detected by Gopy
+
 ### v1.0.0 Initial Release
 This is the first stable release of Gopy. All core features have been implemented and tested.
 
 **Known Limitations:**
-- Only text content is supported
-- Visual content is not yet supported
+- Visual content support added in v1.1.0
 - Network synchronization is not available
 
 **System Requirements:**

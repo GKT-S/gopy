@@ -1,4 +1,4 @@
-# 📋 Gopy - Smart Clipboard Manager
+# 📋 Gopy - Smart Clipboard Manager v1.1.0
 
 > A powerful and user-friendly clipboard manager for modern macOS
 
@@ -22,6 +22,7 @@ This project was developed for personal use and is shared as open source for use
 
 ### 🚀 Core Features
 - **Automatic Clipboard Tracking**: Everything you copy is automatically saved
+- **📷 Screenshot Support**: Automatically captures and manages screenshots copied to clipboard
 - **Smart Categorization**: Automatic tagging based on content type
 - **Quick Search**: Instant search through your clipboard history
 - **Favorites System**: Mark important items as favorites
@@ -40,6 +41,7 @@ This project was developed for personal use and is shared as open source for use
 - **🔐 Passwords**: Secure passwords
 - **🔑 APIs**: API keys and tokens
 - **📱 Numbers**: Phone numbers
+- **📷 Images**: Screenshots and image content
 - **📝 Text**: General text content
 
 ### 🎯 User-Friendly Interface
@@ -123,9 +125,20 @@ After running this command, you can open the app by double-clicking it normally.
 
 ### Basic Usage
 1. **Launch Gopy** - Click the "G" icon in the menu bar
-2. **Copy content** - Copy any text (Cmd+C)
+2. **Copy content** - Copy any text (Cmd+C) or take screenshots
 3. **Access history** - View your clipboard history from the Gopy window
 4. **Reuse** - Click on any item to copy it back to clipboard
+
+### 📷 Screenshot Support
+Gopy automatically captures and manages your screenshots when they are copied to the clipboard:
+
+#### Screenshot Keyboard Shortcuts:
+- **Cmd + Control + Shift + 3**: Full screen → saved as file + copied to clipboard (Gopy will detect)
+- **Cmd + Control + Shift + 4**: Selected area → saved as file + copied to clipboard (Gopy will detect)
+- **Cmd + Shift + 3**: Full screen → saved as file only (Gopy won't detect)
+- **Cmd + Shift + 4**: Selected area → saved as file only (Gopy won't detect)
+
+**💡 Tip**: Use `Cmd + Control + Shift + 4` for screenshots you want to manage in Gopy!
 
 ### Advanced Features
 - **Favorites**: Use ⭐ icon to add important items to favorites
