@@ -69,7 +69,7 @@ curl -fsSL https://raw.githubusercontent.com/GKT-S/gopy/main/install.sh | bash
 ### 🔧 Developer Setup
 
 #### Requirements
-- macOS 12.0 or later
+- macOS 15.2 or later
 - Xcode 14.0 or later
 
 #### Building from Source

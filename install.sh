@@ -32,10 +32,10 @@ fi
 
 
 macos_version=$(sw_vers -productVersion | cut -d. -f1,2)
-required_version="12.0"
+required_version="15.2"
 
-if [[ $(echo "$macos_version >= $required_version" | bc -l) -eq 0 ]]; then
-    echo -e "${RED}❌ Hata: macOS 12.0 veya üzeri gerekli! (Mevcut: $macos_version)${NC}"
+if [[ "$(printf '%s\n' "$required_version" "$macos_version" | sort -V | head -1)" != "$required_version" ]]; then
+    echo -e "${RED}❌ Hata: macOS $required_version veya üzeri gerekli! (Mevcut: $macos_version)${NC}"
     exit 1
 fi
 
@@ -44,7 +44,15 @@ echo -e "${GREEN}✅ macOS $macos_version - Uyumlu${NC}"
 
 TEMP_DIR="/tmp/gopy_install"
 APP_DIR="/Applications"
-DOWNLOAD_URL="https://github.com/GKT-S/gopy/releases/latest/download/Gopy-v1.0.0.zip"
+DOWNLOAD_URL=$(curl -fsSL "https://api.github.com/repos/GKT-S/gopy/releases/latest" \
+    | grep -o '"browser_download_url": *"[^"]*\.zip"' \
+    | head -1 | sed 's/.*"\(https[^"]*\)"/\1/')
+
+if [ -z "$DOWNLOAD_URL" ]; then
+    echo -e "${RED}❌ Hata: Son sürüm bilgisi alınamadı!${NC}"
+    echo -e "${YELLOW}💡 Manuel kurulum için: https://github.com/GKT-S/gopy/releases${NC}"
+    exit 1
+fi
 
 echo -e "${YELLOW}📥 Gopy indiriliyor...${NC}"
 
@@ -114,7 +122,7 @@ echo "╚═══════════════════════�
 echo -e "${NC}"
 
 echo -e "${YELLOW}🤔 Gopy'yi şimdi başlatmak ister misiniz? (y/n)${NC}"
-read -r response
+read -r response < /dev/tty
 if [[ "$response" =~ ^[Yy]$ ]]; then
     echo -e "${GREEN}🚀 Gopy başlatılıyor...${NC}"
     open "$APP_DIR/Gopy.app"
