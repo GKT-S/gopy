@@ -1,4 +1,4 @@
-# 📋 Gopy - Smart Clipboard Manager v1.1.0
+# 📋 Gopy - Smart Clipboard Manager v1.2.0
 
 > A powerful and user-friendly clipboard manager for modern macOS
 

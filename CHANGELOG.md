@@ -14,6 +14,17 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - iOS companion app
 - Multi-language support
 
+## [1.2.0] - 2026-09-28
+
+### Added Features
+- ✅ Launch at login (auto-launch) support
+- ✅ Refreshed macOS Tahoe-style interface
+
+### Improvements
+- 🔧 Reworked clipboard monitoring and settings
+- 🔧 Install script now always downloads the latest release
+- 🔧 Minimum macOS version is now 15.2
+
 ## [1.1.0] - 2025-01-11
 
 ### Added Features
