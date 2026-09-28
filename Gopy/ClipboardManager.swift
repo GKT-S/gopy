@@ -1,6 +1,9 @@
 import SwiftUI
 import AppKit
 import Foundation
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 
 class ClipboardManager: ObservableObject {
     @Published var clipboardItems: [ClipboardItem] = []
@@ -9,18 +12,21 @@ class ClipboardManager: ObservableObject {
     @Published var customTags: [String] = []
     @Published var isShowingFavorites: Bool = false
     @Published var isShowingTagPanel: Bool = false
+    @Published var activeSearchText: String = ""
     
     private var pasteboard = NSPasteboard.general
     private var lastChangeCount: Int = 0
     private var timer: Timer?
+    private let sharedDefaults = SharedDefaults.instance
     
-    @AppStorage("clipboardMonitoringInterval") private var clipboardMonitoringInterval = 1.0
-    @AppStorage("maxClipboardItems") private var maxClipboardItems = 40
-    @AppStorage("enableNotifications") private var enableNotifications = true
+    @AppStorage("clipboardMonitoringInterval", store: SharedDefaults.instance) private var clipboardMonitoringInterval = 1.0
+    @AppStorage("maxClipboardItems", store: SharedDefaults.instance) private var maxClipboardItems = 40
+    @AppStorage("enableNotifications", store: SharedDefaults.instance) private var enableNotifications = true
     
     init() {
         loadClipboardItems()
         loadCustomTags()
+        persistWidgetFavorites()
         startMonitoring()
         updateFilteredItems()
         
@@ -159,44 +165,49 @@ class ClipboardManager: ObservableObject {
         isShowingTagPanel.toggle()
     }
     
-    func setSelectedTag(_ tag: String?) {
+    func setSelectedTag(_ tag: String?, searchText: String? = nil) {
         selectedTag = tag
-        updateFilteredItems()
+        isShowingFavorites = tag?.caseInsensitiveCompare("Favorites") == .orderedSame
+        updateFilteredItems(with: searchText ?? activeSearchText)
     }
     
-    func updateFilteredItems(with searchText: String = "") {
-        var items: [ClipboardItem]
+    func showAllItems(searchText: String? = nil) {
+        selectedTag = nil
+        isShowingFavorites = false
+        updateFilteredItems(with: searchText ?? activeSearchText)
+    }
+    
+    func showFavoritesOnly(searchText: String? = nil) {
+        selectedTag = nil
+        isShowingFavorites = true
+        updateFilteredItems(with: searchText ?? activeSearchText)
+    }
+    
+    func updateFilteredItems(with searchText: String? = nil) {
+        let currentSearch = searchText ?? activeSearchText
+        activeSearchText = currentSearch
         
-        if let selectedTag = selectedTag {
-            if selectedTag == "Favorites" {
-                items = clipboardItems.filter { $0.isFavorite }
-            } else if selectedTag == "Tümü" {
+        var items = clipboardItems
+        
+        if isShowingFavorites {
+            items = items.filter { $0.isFavorite }
+        } else if let selectedTag = selectedTag, !selectedTag.isEmpty {
+            if selectedTag.caseInsensitiveCompare("favorites") == .orderedSame {
+                items = items.filter { $0.isFavorite }
+            } else if selectedTag == "Tümü" || selectedTag == "All" {
                 items = clipboardItems
             } else {
-                items = clipboardItems.filter { $0.tags.contains(selectedTag) }
+                items = items.filter { $0.tags.contains(selectedTag) }
             }
         } else {
-            items = clipboardItems.filter { item in
-                if !item.isFavorite {
-                    return true 
-                }
-                
-                guard let itemIndex = clipboardItems.firstIndex(where: { $0.id == item.id }) else {
-                    return true 
-                }
-                
-                let newerItems = clipboardItems.prefix(upTo: itemIndex)
-                let newerNonFavoritesCount = newerItems.filter { !$0.isFavorite }.count
-                
-                return newerNonFavoritesCount < maxClipboardItems
-            }
+            items = clipboardItems.filter { !$0.isFavorite }
         }
         
-        if !searchText.isEmpty {
+        if !currentSearch.isEmpty {
             items = items.filter { item in
-                (item.content?.localizedCaseInsensitiveContains(searchText) ?? false) ||
-                item.displayContent.localizedCaseInsensitiveContains(searchText) ||
-                item.tags.contains { $0.localizedCaseInsensitiveContains(searchText) }
+                (item.content?.localizedCaseInsensitiveContains(currentSearch) ?? false) ||
+                item.displayContent.localizedCaseInsensitiveContains(currentSearch) ||
+                item.tags.contains { $0.localizedCaseInsensitiveContains(currentSearch) }
             }
         }
         
@@ -240,11 +251,23 @@ class ClipboardManager: ObservableObject {
     }
     
     func clearAllItems() {
-        clipboardItems.removeAll()
+        clipboardItems.removeAll { !$0.isFavorite }
         filteredItems.removeAll()
         saveClipboardItems()
+        updateFilteredItems()
     }
     
+    func itemCount(for tag: String) -> Int {
+        if tag.caseInsensitiveCompare("Favorites") == .orderedSame {
+            return clipboardItems.filter { $0.isFavorite }.count
+        }
+        return clipboardItems.filter { !$0.isFavorite && $0.tags.contains(tag) }.count
+    }
+
+    var nonFavoriteCount: Int {
+        clipboardItems.filter { !$0.isFavorite }.count
+    }
+
     func getTagColor(for tag: String) -> Color {
         if let category = TagCategory.allCases.first(where: { $0.rawValue == tag }) {
             return category.color
@@ -261,7 +284,7 @@ class ClipboardManager: ObservableObject {
     
     private func showNotification(for item: ClipboardItem) {
         let content = UNMutableNotificationContent()
-        content.title = "Gopy - Yeni İçerik"
+        content.title = "Gopy - New Content"
         content.body = String(item.displayContent.prefix(50))
         content.sound = nil
         
@@ -277,25 +300,53 @@ class ClipboardManager: ObservableObject {
         }
     }
     
-    private func saveClipboardItems() {
-        if let encoded = try? JSONEncoder().encode(clipboardItems) {
-            UserDefaults.standard.set(encoded, forKey: "clipboardItems")
+    private func persistWidgetFavorites() {
+        let favorites = clipboardItems
+            .filter { $0.isFavorite }
+            .sorted(by: { $0.date > $1.date })
+            .prefix(6)
+            .map { item in
+                WidgetFavorite(
+                    id: item.id,
+                    title: item.displayContent,
+                    note: item.note,
+                    isImage: item.isImage,
+                    date: item.date
+                )
+            }
+        
+        if let encoded = try? JSONEncoder().encode(favorites) {
+            sharedDefaults.set(encoded, forKey: StorageKeys.widgetFavorites)
         }
     }
     
+    private func refreshWidgets() {
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadTimelines(ofKind: WidgetKind.favorites)
+        #endif
+    }
+    
+    private func saveClipboardItems() {
+        if let encoded = try? JSONEncoder().encode(clipboardItems) {
+            sharedDefaults.set(encoded, forKey: StorageKeys.clipboardItems)
+        }
+        persistWidgetFavorites()
+        refreshWidgets()
+    }
+    
     private func loadClipboardItems() {
-        if let data = UserDefaults.standard.data(forKey: "clipboardItems"),
+        if let data = sharedDefaults.data(forKey: StorageKeys.clipboardItems),
            let decoded = try? JSONDecoder().decode([ClipboardItem].self, from: data) {
             clipboardItems = decoded
         }
     }
     
     private func saveCustomTags() {
-        UserDefaults.standard.set(customTags, forKey: "customTags")
+        sharedDefaults.set(customTags, forKey: StorageKeys.customTags)
     }
     
     private func loadCustomTags() {
-        customTags = UserDefaults.standard.stringArray(forKey: "customTags") ?? []
+        customTags = sharedDefaults.stringArray(forKey: StorageKeys.customTags) ?? []
     }
 }
 

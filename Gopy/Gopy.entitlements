@@ -16,5 +16,9 @@
 	<false/>
 	<key>com.apple.security.network.server</key>
 	<false/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.gopy.shared</string>
+	</array>
 </dict>
 </plist>

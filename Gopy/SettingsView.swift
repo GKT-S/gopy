@@ -2,9 +2,9 @@ import SwiftUI
 import ServiceManagement
 
 struct SettingsView: View {
-    @AppStorage("clipboardMonitoringInterval") private var clipboardMonitoringInterval = 1.0
-    @AppStorage("maxClipboardItems") private var maxClipboardItems = 40
-    @AppStorage("enableNotifications") private var enableNotifications = true
+    @AppStorage("clipboardMonitoringInterval", store: SharedDefaults.instance) private var clipboardMonitoringInterval = 1.0
+    @AppStorage("maxClipboardItems", store: SharedDefaults.instance) private var maxClipboardItems = 40
+    @AppStorage("enableNotifications", store: SharedDefaults.instance) private var enableNotifications = true
     @State private var launchAtLogin: Bool = true // Default to true for first launch
     
     var body: some View {
@@ -35,16 +35,31 @@ struct SettingsView: View {
                 }
             }
             
+            Section("Shortcut") {
+                HStack {
+                    Text("Toggle Gopy")
+                    Spacer()
+                    Text("⌥ Space")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.secondary.opacity(0.15))
+                        )
+                }
+            }
+
             Section("About") {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Gopy")
                         .font(.title2)
                         .fontWeight(.bold)
-                    
-                    Text("Version 1.0.0")
+
+                    Text("Version 1.2.0")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    
+
                     Text("Smart clipboard manager")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -56,7 +71,7 @@ struct SettingsView: View {
         .frame(width: 400, height: 400)
         .navigationTitle("Settings")
         .onAppear {
-            // İlk açılışta launch at login'i aktif et
+            // Enable launch at login on first appearance
             if SMAppService.mainApp.status == .notRegistered {
                 launchAtLogin = true
                 toggleLaunchAtLogin(enabled: true)

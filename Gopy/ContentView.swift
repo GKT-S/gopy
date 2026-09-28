@@ -11,103 +11,38 @@ struct ContentView: View {
     @EnvironmentObject var clipboardManager: ClipboardManager
     @State private var searchText = ""
     @State private var copiedItemId: UUID? = nil
-    
-    @State private var noteEditorWindow: NSWindow? = nil
-    @State private var noteEditorItem: ClipboardItem? = nil
-    @State private var currentNoteText = ""
-    
+    @State private var editingNoteItemId: UUID? = nil
+
     var body: some View {
-        HStack(spacing: 0) {
-            
-            if clipboardManager.isShowingTagPanel {
-                TagSidePanel(clipboardManager: clipboardManager)
-                    .frame(width: 150)
-                    .transition(.move(edge: .leading))
-            }
-            
-            VStack(spacing: 0) {
-                HeaderView(
-                    searchText: $searchText,
-                    clipboardManager: clipboardManager
-                )
-                
-                ClipboardListView(
-                    clipboardManager: clipboardManager,
-                    copiedItemId: $copiedItemId,
-                    onEditNote: { item in
-                        self.showNoteEditor(for: item)
-                    }
-                )
+        TahoeWindowContainer {
+            HStack(alignment: .top, spacing: 16) {
+
+                if clipboardManager.isShowingTagPanel {
+                    TagSidePanel(clipboardManager: clipboardManager)
+                        .frame(width: 160)
+                        .transition(.move(edge: .leading))
+                }
+
+                VStack(spacing: 16) {
+                    HeaderView(
+                        searchText: $searchText,
+                        clipboardManager: clipboardManager
+                    )
+
+                    ClipboardListView(
+                        clipboardManager: clipboardManager,
+                        copiedItemId: $copiedItemId,
+                        editingNoteItemId: $editingNoteItemId
+                    )
+                }
             }
         }
-        .frame(width: 550, height: 500)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.3))
+        .frame(width: 580, height: 520)
         .onAppear {
             clipboardManager.updateFilteredItems(with: searchText)
-            
+
             DispatchQueue.main.async {
                 NSApp.setActivationPolicy(.accessory)
-            }
-        }
-    }
-    
-    private func showNoteEditor(for item: ClipboardItem) {
-        DispatchQueue.main.async {
-            noteEditorWindow?.close()
-            noteEditorWindow = nil
-        }
-        
-        noteEditorItem = item
-        currentNoteText = item.note ?? ""
-        
-        DispatchQueue.main.async {
-            let noteEditor = NoteEditorWindowView(
-                item: item,
-                noteText: currentNoteText,
-                onSave: { updatedItem, note in
-                    DispatchQueue.main.async {
-                        clipboardManager.updateNote(for: updatedItem.id, newNote: note)
-                        noteEditorWindow?.close()
-                        noteEditorWindow = nil
-                    }
-                },
-                onCancel: {
-                    DispatchQueue.main.async {
-                        noteEditorWindow?.close()
-                        noteEditorWindow = nil
-                    }
-                }
-            )
-            
-            let hostingController = NSHostingController(rootView: noteEditor)
-            
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 480, height: 360),
-                styleMask: [.titled, .closable, .resizable],
-                backing: .buffered,
-                defer: false
-            )
-            
-            window.title = "Not Ekle - Gopy"
-            window.contentViewController = hostingController
-            window.isReleasedWhenClosed = false
-            
-            window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.popUpMenuWindow)))
-            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-            window.minSize = NSSize(width: 500, height: 280)
-            window.maxSize = NSSize(width: 800, height: 450)
-            window.center()
-            
-            noteEditorWindow = window
-            
-            window.orderFrontRegardless()
-            window.makeKeyAndOrderFront(nil)
-            
-            NSApp.activate(ignoringOtherApps: true)
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                window.makeKey()
-                NSApp.activate(ignoringOtherApps: true)
             }
         }
     }
@@ -116,145 +51,286 @@ struct ContentView: View {
 struct HeaderView: View {
     @Binding var searchText: String
     @ObservedObject var clipboardManager: ClipboardManager
-    
+    @State private var showClearConfirmation = false
+
     var body: some View {
-        HStack(spacing: 8) {
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    clipboardManager.isShowingTagPanel.toggle()
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Text("Gopy")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.primary.opacity(0.9))
+
+                Spacer(minLength: 6)
+
+                if !clipboardManager.filteredItems.isEmpty {
+                    Label("\(clipboardManager.filteredItems.count)", systemImage: clipboardManager.isShowingFavorites ? "star.fill" : "doc.on.doc")
+                        .font(.system(size: 11, weight: .medium))
+                        .labelStyle(.titleAndIcon)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.15))
+                                .overlay(
+                                    Capsule()
+                                        .stroke(Color.white.opacity(0.28), lineWidth: 0.8)
+                                )
+                        )
+                        .foregroundStyle(Color.primary.opacity(0.75))
+                        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: clipboardManager.filteredItems.count)
                 }
-            }) {
-                Image(systemName: "line.horizontal.3")
-                    .foregroundColor(.primary)
-                    .font(.system(size: 14))
             }
-            .buttonStyle(.plain)
-            
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.secondary)
-                    .font(.system(size: 12))
-                
-                TextField("Search...", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .onChange(of: searchText) {
-                        clipboardManager.updateFilteredItems(with: searchText)
+
+            HStack(spacing: 10) {
+                Button(action: {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                        clipboardManager.isShowingTagPanel.toggle()
                     }
+                }) {
+                    Image(systemName: clipboardManager.isShowingTagPanel ? "sidebar.leading" : "sidebar.trailing")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .buttonStyle(TahoePillStyle())
+                .focusEffectDisabled()
+                .help(clipboardManager.isShowingTagPanel ? "Hide tags" : "Show tags")
+
+                searchField
+
+                Spacer(minLength: 4)
+
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
+                        if clipboardManager.isShowingFavorites {
+                            clipboardManager.showAllItems(searchText: searchText)
+                        } else {
+                            clipboardManager.showFavoritesOnly(searchText: searchText)
+                        }
+                    }
+                }) {
+                    Image(systemName: clipboardManager.isShowingFavorites ? "star.fill" : "star")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .buttonStyle(TahoePillStyle(isProminent: clipboardManager.isShowingFavorites, tint: .yellow))
+                .focusEffectDisabled()
+                .help("Favorites")
+
+                Button(role: .destructive) {
+                    showClearConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .buttonStyle(TahoePillStyle(isProminent: true, tint: Color.red))
+                .focusEffectDisabled()
+                .help("Clear all")
+                .alert("Clear Clipboard History", isPresented: $showClearConfirmation) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Clear All", role: .destructive) {
+                        clipboardManager.clearAllItems()
+                    }
+                } message: {
+                    let favCount = clipboardManager.clipboardItems.filter { $0.isFavorite }.count
+                    if favCount > 0 {
+                        Text("This will delete all clipboard items except your \(favCount) favorite(s). This action cannot be undone.")
+                    } else {
+                        Text("This will delete all clipboard items. This action cannot be undone.")
+                    }
+                }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color(NSColor.controlBackgroundColor))
-            .cornerRadius(6)
-            
-            Button("Clear") {
-                clipboardManager.clearAllItems()
-            }
-            .font(.system(size: 11))
-            .buttonStyle(.plain)
-            .foregroundColor(.secondary)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 4)
+    }
+    
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(Color.secondary.opacity(0.75))
+                .font(.system(size: 12, weight: .medium))
+            
+            TextField("Search content or tags", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13, weight: .medium))
+                .onChange(of: searchText) {
+                    clipboardManager.updateFilteredItems(with: searchText)
+                }
+        }
+        .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(Color(NSColor.windowBackgroundColor).opacity(0.8))
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.white.opacity(0.22), lineWidth: 1)
+                )
+        )
     }
 }
 
 struct TagSidePanel: View {
     @ObservedObject var clipboardManager: ClipboardManager
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            TagFilterButton(
-                title: "All",
-                icon: "tray.fill",
-                isSelected: clipboardManager.selectedTag == nil && !clipboardManager.isShowingFavorites,
-                action: {
-                    clipboardManager.selectedTag = nil
-                    clipboardManager.isShowingFavorites = false
-                    clipboardManager.updateFilteredItems()
-                }
-            )
-            
-            TagFilterButton(
-                title: "Favorites",
-                icon: "star.fill",
-                isSelected: clipboardManager.isShowingFavorites,
-                action: {
-                    clipboardManager.isShowingFavorites = true
-                    clipboardManager.selectedTag = nil
-                    clipboardManager.updateFilteredItems()
-                }
-            )
-            
-            Divider()
-                .padding(.vertical, 4)
-            
-            ForEach(TagCategory.allCases, id: \.rawValue) { category in
+        TahoeSidebarBackground {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Collections")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.secondary)
+                    .padding(.bottom, 2)
+
                 TagFilterButton(
-                    title: category.rawValue.capitalized,
-                    icon: category.icon,
-                    isSelected: clipboardManager.selectedTag == category.rawValue,
+                    title: "All",
+                    icon: "tray.fill",
+                    count: clipboardManager.nonFavoriteCount,
+                    isSelected: clipboardManager.selectedTag == nil && !clipboardManager.isShowingFavorites,
                     action: {
-                        clipboardManager.selectedTag = category.rawValue
-                        clipboardManager.isShowingFavorites = false
-                        clipboardManager.updateFilteredItems()
+                        clipboardManager.showAllItems()
                     }
                 )
-            }
-            
-            if !clipboardManager.customTags.isEmpty {
+
+                TagFilterButton(
+                    title: "Favorites",
+                    icon: "star.fill",
+                    count: clipboardManager.itemCount(for: "Favorites"),
+                    isSelected: clipboardManager.isShowingFavorites,
+                    action: {
+                        clipboardManager.showFavoritesOnly()
+                    }
+                )
+
                 Divider()
+                    .background(Color.white.opacity(0.1))
                     .padding(.vertical, 4)
-                
-                ForEach(clipboardManager.customTags, id: \.self) { tag in
-                    TagFilterButton(
-                        title: tag,
-                        icon: "tag",
-                        isSelected: clipboardManager.selectedTag == tag,
-                        action: {
-                            clipboardManager.selectedTag = tag
-                            clipboardManager.isShowingFavorites = false
-                            clipboardManager.updateFilteredItems()
-                        }
-                    )
+
+                ForEach(TagCategory.allCases, id: \.rawValue) { category in
+                    let count = clipboardManager.itemCount(for: category.rawValue)
+                    if count > 0 {
+                        TagFilterButton(
+                            title: category.rawValue,
+                            icon: category.icon,
+                            count: count,
+                            isSelected: clipboardManager.selectedTag == category.rawValue,
+                            action: {
+                                clipboardManager.selectedTag = category.rawValue
+                                clipboardManager.isShowingFavorites = false
+                                clipboardManager.updateFilteredItems()
+                            }
+                        )
+                    }
                 }
+
+                if !clipboardManager.customTags.isEmpty {
+                    Divider()
+                        .background(Color.white.opacity(0.1))
+                        .padding(.vertical, 4)
+
+                    ForEach(clipboardManager.customTags, id: \.self) { tag in
+                        TagFilterButton(
+                            title: tag,
+                            icon: "tag",
+                            count: clipboardManager.itemCount(for: tag),
+                            isSelected: clipboardManager.selectedTag == tag,
+                            action: {
+                                clipboardManager.selectedTag = tag
+                                clipboardManager.isShowingFavorites = false
+                                clipboardManager.updateFilteredItems()
+                            }
+                        )
+                    }
+                }
+
+                Spacer(minLength: 8)
             }
-            
-            Spacer()
+            .padding(.horizontal, 12)
+            .padding(.vertical, 16)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 12)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
     }
 }
 
 struct TagFilterButton: View {
     let title: String
     let icon: String
+    var count: Int = 0
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 11))
-                    .foregroundColor(isSelected ? .white : getIconColor())
-                
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(isSelected ? Color.white : getIconColor().opacity(0.85))
+                    .frame(width: 16)
+
                 Text(title)
-                    .font(.system(size: 11))
-                    .foregroundColor(isSelected ? .white : .primary)
-                
-                Spacer()
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(0.85))
+
+                Spacer(minLength: 6)
+
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(isSelected ? Color.white.opacity(0.9) : Color.secondary.opacity(0.7))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(isSelected ? Color.white.opacity(0.2) : Color.white.opacity(0.1))
+                        )
+                }
+
+                if isSelected {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.8))
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(isSelected ? Color.accentColor : Color.clear)
-            .cornerRadius(6)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(buttonBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(buttonStroke, lineWidth: 1)
+                    )
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .animation(.spring(response: 0.35, dampingFraction: 0.82), value: isSelected)
+    }
+    
+    private var buttonBackground: LinearGradient {
+        if isSelected {
+            return LinearGradient(
+                colors: [
+                    Color.accentColor.opacity(0.45),
+                    Color.accentColor.opacity(0.25)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        
+        return LinearGradient(
+            colors: [
+                Color.white.opacity(0.14),
+                Color.white.opacity(0.06)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+    
+    private var buttonStroke: Color {
+        if isSelected {
+            return Color.white.opacity(0.42)
+        }
+        return Color.white.opacity(0.18)
     }
     
     private func getIconColor() -> Color {
@@ -275,34 +351,58 @@ struct TagFilterButton: View {
 struct ClipboardListView: View {
     @ObservedObject var clipboardManager: ClipboardManager
     @Binding var copiedItemId: UUID?
-    let onEditNote: (ClipboardItem) -> Void
-    
+    @Binding var editingNoteItemId: UUID?
+
+    private var emptyStateInfo: (icon: String, message: String) {
+        if clipboardManager.isShowingFavorites {
+            return ("star.slash", "No favorites yet. Star an item to save it here.")
+        } else if let tag = clipboardManager.selectedTag {
+            return ("tag.slash", "No \(tag) items found.")
+        } else if !clipboardManager.activeSearchText.isEmpty {
+            return ("magnifyingglass", "No results for \"\(clipboardManager.activeSearchText)\"")
+        }
+        return ("doc.on.clipboard", "No clipboard items yet. Copy something to get started.")
+    }
+
     var body: some View {
         if clipboardManager.filteredItems.isEmpty {
-            VStack(spacing: 8) {
-                Image(systemName: "doc.on.clipboard")
-                    .font(.system(size: 32))
+            VStack(spacing: 10) {
+                Image(systemName: emptyStateInfo.icon)
+                    .font(.system(size: 28))
+                    .foregroundColor(.secondary.opacity(0.7))
+
+                Text(emptyStateInfo.message)
+                    .font(.system(size: 13))
                     .foregroundColor(.secondary)
-                
-                Text("No clipboard items yet")
-                    .font(.system(size: 14))
-                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
-                LazyVStack(spacing: 1) {
+                LazyVStack(spacing: 10) {
                     ForEach(clipboardManager.filteredItems) { item in
                         ClipboardItemRow(
                             item: item,
                             clipboardManager: clipboardManager,
                             copiedItemId: $copiedItemId,
-                            onEditNote: onEditNote
+                            editingNoteItemId: $editingNoteItemId
                         )
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, 12)
+                .padding(.horizontal, 10)
             }
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.white.opacity(0.12))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .tahoeSmoothList()
         }
     }
 }
@@ -311,138 +411,265 @@ struct ClipboardItemRow: View {
     let item: ClipboardItem
     @ObservedObject var clipboardManager: ClipboardManager
     @Binding var copiedItemId: UUID?
-    let onEditNote: (ClipboardItem) -> Void
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 6) {
-                HStack(spacing: 2) {
-                    ForEach(item.tags.prefix(2), id: \.self) { tag in
-                        TagIcon(tag: tag)
-                    }
-                    
-                    if item.tags.count > 2 {
-                        Text("+\(item.tags.count - 2)")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 2)
-                    }
-                }
-                .frame(width: 60, alignment: .leading)
-                
-                if item.isImage {
-                    HStack(spacing: 8) {
-                        if let image = item.image {
-                            Image(nsImage: image)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 24, height: 24)
-                                .cornerRadius(4)
-                        }
-                        
-                        Text(item.displayContent)
-                            .font(.system(size: 12))
-                            .foregroundColor(.primary)
-                    }
-                } else {
-                    Text(singleLineContent)
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-                
-                Spacer()
-                
-                Button(action: {
-                    onEditNote(item)
-                }) {
-                    Image(systemName: item.note?.isEmpty == false ? "note.text" : "note.text.badge.plus")
-                        .foregroundColor(item.note?.isEmpty == false ? .blue : .secondary)
-                        .font(.system(size: 12))
-                }
-                .buttonStyle(.plain)
+    @Binding var editingNoteItemId: UUID?
+    @State private var noteText: String = ""
+    @FocusState private var isNoteFieldFocused: Bool
 
-                Button(action: {
-                    clipboardManager.toggleFavorite(for: item.id)
-                }) {
-                    Image(systemName: item.isFavorite ? "star.fill" : "star")
-                        .foregroundColor(item.isFavorite ? .yellow : .secondary)
-                        .font(.system(size: 12))
-                }
-                .buttonStyle(.plain)
-                .padding(.trailing, 10)
+    private var isEditingNote: Bool {
+        editingNoteItemId == item.id
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
+                contentView
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                controlStack
             }
-            
-            if let note = item.note, !note.isEmpty {
+
+            if let note = item.note, !note.isEmpty, !isEditingNote {
                 Text(note)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.leading, 68)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.secondary.opacity(0.9))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+            }
+
+            if isEditingNote {
+                HStack(spacing: 8) {
+                    TextField("Add a note...", text: $noteText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12, weight: .medium))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color.white.opacity(0.12))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .stroke(Color.accentColor.opacity(0.4), lineWidth: 1)
+                                )
+                        )
+                        .focused($isNoteFieldFocused)
+                        .onSubmit {
+                            saveNote()
+                        }
+
+                    Button(action: saveNote) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Color.green)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: { editingNoteItemId = nil }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Color.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            // Time at bottom-right
+            HStack {
+                Spacer()
+                Text(timeAgoString(from: item.date))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color.secondary.opacity(0.7))
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .contentShape(Rectangle())
+        .padding(.vertical, 10)
+        .padding(.horizontal, 14)
         .background(
-            Rectangle()
-                .fill(Color.clear)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(rowBackground)
                 .overlay(
-                    Color.accentColor.opacity(copiedItemId == item.id ? 0.15 : 0)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(rowStroke, lineWidth: copiedItemId == item.id ? 1.4 : 0.9)
                 )
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.accentColor.opacity(copiedItemId == item.id ? 0.4 : 0.0), lineWidth: 1.6)
+        )
+        .shadow(color: Color.black.opacity(item.isFavorite ? 0.14 : 0.08), radius: copiedItemId == item.id ? 9 : 6, x: 0, y: 6)
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onTapGesture {
+            guard !isEditingNote else { return }
             clipboardManager.copyItemToClipboard(item)
             copiedItemId = item.id
-            
+
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 copiedItemId = nil
-                NSApp.keyWindow?.close()
+                NotificationCenter.default.post(name: .hidGopyPanel, object: nil)
             }
         }
-        .scaleEffect(copiedItemId == item.id ? 0.98 : 1.0)
-        .animation(.easeInOut(duration: 0.2), value: copiedItemId)
+        .contextMenu {
+            Button {
+                clipboardManager.copyItemToClipboard(item)
+                copiedItemId = item.id
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    copiedItemId = nil
+                }
+            } label: {
+                Label("Copy", systemImage: "doc.on.doc")
+            }
+
+            Button {
+                clipboardManager.toggleFavorite(for: item.id)
+            } label: {
+                Label(item.isFavorite ? "Remove from Favorites" : "Add to Favorites", systemImage: item.isFavorite ? "star.slash" : "star")
+            }
+
+            Button {
+                noteText = item.note ?? ""
+                editingNoteItemId = item.id
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    isNoteFieldFocused = true
+                }
+            } label: {
+                Label(item.note?.isEmpty == false ? "Edit Note" : "Add Note", systemImage: "note.text")
+            }
+
+            Divider()
+
+            Button(role: .destructive) {
+                clipboardManager.deleteItem(item)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .scaleEffect(copiedItemId == item.id ? 0.985 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.78), value: copiedItemId)
+    }
+
+    private func saveNote() {
+        clipboardManager.updateNote(for: item.id, newNote: noteText)
+        editingNoteItemId = nil
+    }
+    
+    private var contentView: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if item.isImage, let image = item.image {
+                HStack(alignment: .center, spacing: 10) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 38, height: 38)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 0.8)
+                        )
+                    
+                    Text(item.displayContent)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color.primary.opacity(0.92))
+                        .lineLimit(2)
+                }
+            } else {
+                Text(singleLineContent)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.primary.opacity(0.96))
+                    .lineLimit(2)
+            }
+        }
+    }
+    
+    private var controlStack: some View {
+        HStack(spacing: 8) {
+            Button(action: {
+                if isEditingNote {
+                    editingNoteItemId = nil
+                } else {
+                    noteText = item.note ?? ""
+                    editingNoteItemId = item.id
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        isNoteFieldFocused = true
+                    }
+                }
+            }) {
+                Image(systemName: item.note?.isEmpty == false ? "note.text" : "note.text.badge.plus")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(isEditingNote ? Color.accentColor : Color.primary.opacity(0.9))
+                    .padding(6)
+                    .background(controlBackground(isActive: item.note?.isEmpty == false || isEditingNote, tint: .blue))
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .help(item.note?.isEmpty == false ? "Edit note" : "Add note")
+            
+            Button(action: {
+                clipboardManager.toggleFavorite(for: item.id)
+            }) {
+                Image(systemName: item.isFavorite ? "star.fill" : "star")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(item.isFavorite ? Color.yellow : Color.primary.opacity(0.75))
+                    .padding(6)
+                    .background(controlBackground(isActive: item.isFavorite, tint: .yellow))
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .help(item.isFavorite ? "Remove from favorites" : "Add to favorites")
+        }
+    }
+    
+    private func controlBackground(isActive: Bool, tint: Color) -> some View {
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        tint.opacity(isActive ? 0.32 : 0.18),
+                        tint.opacity(isActive ? 0.2 : 0.1)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.white.opacity(isActive ? 0.45 : 0.25), lineWidth: isActive ? 1.1 : 0.6)
+            )
+    }
+    
+    private var rowBackground: LinearGradient {
+        if item.isFavorite {
+            return LinearGradient(
+                colors: [
+                    Color.yellow.opacity(0.18),
+                    Color.yellow.opacity(0.08)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        
+        return LinearGradient(
+            colors: [
+                Color.white.opacity(0.12),
+                Color.white.opacity(0.06)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+    
+    private var rowStroke: Color {
+        item.isFavorite ? Color.yellow.opacity(0.35) : Color.white.opacity(0.2)
     }
     
     private var singleLineContent: String {
         let content = item.content ?? item.displayContent
-        
         let cleaned = content
             .replacingOccurrences(of: "\n", with: " ")
             .replacingOccurrences(of: "\t", with: " ")
             .replacingOccurrences(of: "  ", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         
-        return String(cleaned.prefix(100))
-    }
-}
-
-struct TagIcon: View {
-    let tag: String
-    
-    var body: some View {
-        Image(systemName: getTagIcon(tag))
-            .font(.system(size: 10))
-            .foregroundColor(getTagColor(tag))
-            .padding(2)
-            .background(getTagColor(tag).opacity(0.2))
-            .clipShape(Circle())
-    }
-    
-    private func getTagIcon(_ tag: String) -> String {
-        if let category = TagCategory(rawValue: tag) {
-            return category.icon
-        }
-        return "tag"
-    }
-    
-    private func getTagColor(_ tag: String) -> Color {
-        if let category = TagCategory(rawValue: tag) {
-            return category.color
-        }
-        return .cyan
+        return String(cleaned.prefix(160))
     }
 }
 
@@ -452,151 +679,10 @@ func copyToClipboard(_ content: String) {
     pasteboard.setString(content, forType: .string)
 }
 
-func timeAgoString(from date: Date) -> String {
-    let now = Date()
-    let timeInterval = now.timeIntervalSince(date)
-    
-    if timeInterval < 60 {
-        return "now"
-    } else if timeInterval < 3600 {
-        let minutes = Int(timeInterval / 60)
-        return "\(minutes)m ago"
-    } else if timeInterval < 86400 {
-        let hours = Int(timeInterval / 3600)
-        return "\(hours)h ago"
-    } else {
-        let days = Int(timeInterval / 86400)
-        return "\(days)d ago"
-    }
-}
-
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
+            .environmentObject(ClipboardManager())
             .frame(width: 400, height: 500)
-    }
-}
-
-struct NoteEditorWindowView: View {
-    let item: ClipboardItem
-    @State private var noteText: String
-    let onSave: (ClipboardItem, String) -> Void
-    let onCancel: () -> Void
-    @FocusState private var isTextEditorFocused: Bool
-    
-    init(item: ClipboardItem, noteText: String, onSave: @escaping (ClipboardItem, String) -> Void, onCancel: @escaping () -> Void) {
-        self.item = item
-        self._noteText = State(initialValue: noteText)
-        self.onSave = onSave
-        self.onCancel = onCancel
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .top, spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.blue.opacity(0.1))
-                            .frame(width: 40, height: 40)
-                        
-                        Image(systemName: "note.text")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(.blue)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Add Note")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.primary)
-                        
-                        Text(String(item.displayContent.prefix(120)) + (item.displayContent.count > 120 ? "..." : ""))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
-                    }
-                    
-                    Spacer()
-                }
-                
-                Divider()
-                    .background(Color.secondary.opacity(0.2))
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 24)
-            .padding(.bottom, 20)
-            .background(Color(NSColor.windowBackgroundColor))
-            
-            VStack(spacing: 20) {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("Note:")
-                            .font(.headline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.primary)
-                        
-                        Spacer()
-                        
-                        Text("\(noteText.count) characters")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(NSColor.textBackgroundColor))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(
-                                        isTextEditorFocused ? Color.blue : Color.secondary.opacity(0.3),
-                                        lineWidth: isTextEditorFocused ? 2 : 1
-                                    )
-                            )
-                            .shadow(color: .black.opacity(0.03), radius: 2, x: 0, y: 1)
-                        
-                        TextEditor(text: $noteText)
-                            .font(.body)
-                            .scrollContentBackground(.hidden)
-                            .background(Color.clear)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .focused($isTextEditorFocused)
-                    }
-                    .frame(minHeight: 120, maxHeight: 180)
-                }
-                
-                HStack(spacing: 12) {
-                    Button("Cancel") {
-                        onCancel()
-                    }
-                    .keyboardShortcut(.cancelAction)
-                    .buttonStyle(.bordered)
-                    .foregroundColor(.secondary)
-                    .controlSize(.large)
-                    
-                    Spacer()
-                    
-                    Button("Save") {
-                        onSave(item, noteText)
-                    }
-                    .keyboardShortcut(.defaultAction)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .disabled(noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 24)
-            .background(Color(NSColor.windowBackgroundColor))
-        }
-        .background(Color(NSColor.windowBackgroundColor))
-        .frame(minWidth: 480, idealWidth: 480, maxWidth: .infinity)
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                isTextEditorFocused = true
-            }
-        }
     }
 }

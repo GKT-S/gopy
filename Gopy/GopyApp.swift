@@ -7,39 +7,52 @@
 
 import SwiftUI
 import AppKit
+import Carbon.HIToolbox
 
 @main
 struct GopyApp: App {
-    @StateObject private var clipboardManager = ClipboardManager()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        MenuBarExtra {
-            ContentView()
-                .environmentObject(clipboardManager)
-        } label: {
-            // "G" harfi olarak ikon
-            Text("G")
-                .font(.system(size: 16, weight: .bold))
-        }
-        .menuBarExtraStyle(.window)
-        
         Settings {
             SettingsView()
         }
     }
 }
 
+// MARK: - App Delegate
+
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
-    var popover: NSPopover?
-    var settingsWindow: NSWindow?
-    
+    var floatingPanel: FloatingPanel?
+    let clipboardManager = ClipboardManager()
+    private var hotKeyRef: EventHotKeyRef?
+    private var clickOutsideMonitor: Any?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Create menu bar item
+        NSApp.setActivationPolicy(.accessory)
+        setupStatusBar()
+        setupFloatingPanel()
+        setupCarbonHotkey()
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(hidePanelFromNotification),
+            name: .hidGopyPanel,
+            object: nil
+        )
+    }
+
+    @objc private func hidePanelFromNotification() {
+        hidePanel()
+    }
+
+    // MARK: - Status Bar
+
+    private func setupStatusBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        
+
         if let button = statusItem?.button {
-            // Create G icon
             let gIcon = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
                 NSColor.labelColor.set()
                 let font = NSFont.systemFont(ofSize: 16, weight: .semibold)
@@ -59,119 +72,211 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return true
             }
             gIcon.isTemplate = true
-            
             button.image = gIcon
-            button.action = #selector(togglePopover)
+            button.action = #selector(statusBarClicked)
             button.target = self
-            
-            // Add right-click menu
+
             let menu = NSMenu()
-            menu.addItem(NSMenuItem(title: "Gopy'yi Göster", action: #selector(showPopover), keyEquivalent: ""))
+            menu.addItem(NSMenuItem(title: "Show Gopy", action: #selector(showPanel), keyEquivalent: ""))
             menu.addItem(NSMenuItem.separator())
-            menu.addItem(NSMenuItem(title: "Ayarlar...", action: #selector(showSettings), keyEquivalent: ","))
-            menu.addItem(NSMenuItem(title: "Çıkış", action: #selector(quitApp), keyEquivalent: "q"))
-            
-            button.menu = menu
-        }
-        
-        // Create popover
-        popover = NSPopover()
-        popover?.contentSize = NSSize(width: 550, height: 500)
-        popover?.behavior = .transient
-        popover?.animates = true
-        popover?.contentViewController = NSHostingController(rootView: ContentView())
-        
-        // Enable auto-launch at login
-        enableAutoLaunch()
-    }
-    
-    @objc func togglePopover() {
-        if let popover = popover {
-            if popover.isShown {
-                popover.performClose(nil)
-            } else {
-                showPopover()
+
+            let shortcutItem = NSMenuItem(title: "Shortcut: ⌥ Space", action: nil, keyEquivalent: "")
+            shortcutItem.isEnabled = false
+            menu.addItem(shortcutItem)
+
+            menu.addItem(NSMenuItem.separator())
+            menu.addItem(NSMenuItem(title: "Settings...", action: #selector(showSettings), keyEquivalent: ","))
+            menu.addItem(NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q"))
+
+            statusItem?.menu = nil
+
+            NSEvent.addLocalMonitorForEvents(matching: .rightMouseUp) { [weak self] event in
+                guard let self = self, let button = self.statusItem?.button else { return event }
+                let locationInButton = button.convert(event.locationInWindow, from: nil)
+                if button.bounds.contains(locationInButton) {
+                    self.statusItem?.menu = menu
+                    button.performClick(nil)
+                    DispatchQueue.main.async {
+                        self.statusItem?.menu = nil
+                    }
+                    return nil
+                }
+                return event
             }
         }
     }
-    
-    @objc func showPopover() {
-        if let popover = popover, let button = statusItem?.button {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            
-            // Activate the app to ensure proper focus
-            NSApp.activate(ignoringOtherApps: true)
+
+    // MARK: - Carbon Global Hotkey (Option+Space) — works reliably everywhere
+
+    private func setupCarbonHotkey() {
+        let hotKeyID = EventHotKeyID(
+            signature: OSType(0x474F5059), // "GOPY"
+            id: 1
+        )
+
+        var eventType = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard),
+            eventKind: UInt32(kEventHotKeyPressed)
+        )
+
+        // Store self in a global so the C callback can reach it
+        AppDelegate.shared = self
+
+        InstallEventHandler(
+            GetApplicationEventTarget(),
+            { (_, event, _) -> OSStatus in
+                DispatchQueue.main.async {
+                    AppDelegate.shared?.togglePanel()
+                }
+                return noErr
+            },
+            1,
+            &eventType,
+            nil,
+            nil
+        )
+
+        // Option + Space (keyCode 49 = Space, optionKey = Option modifier)
+        RegisterEventHotKey(
+            UInt32(kVK_Space),
+            UInt32(optionKey),
+            hotKeyID,
+            GetApplicationEventTarget(),
+            0,
+            &hotKeyRef
+        )
+    }
+
+    private static var shared: AppDelegate?
+
+    // MARK: - Floating Panel
+
+    private func setupFloatingPanel() {
+        let contentView = ContentView()
+            .environmentObject(clipboardManager)
+
+        floatingPanel = FloatingPanel(content: contentView)
+    }
+
+    // MARK: - Actions
+
+    @objc func statusBarClicked() {
+        togglePanel()
+    }
+
+    func togglePanel() {
+        guard let panel = floatingPanel else { return }
+
+        if panel.isVisible {
+            hidePanel()
+        } else {
+            showPanel()
         }
     }
-    
-    @objc func showSettings() {
-        if settingsWindow == nil {
-            let settingsView = SettingsView()
-            let hostingController = NSHostingController(rootView: settingsView)
-            
-            settingsWindow = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 400, height: 400),
-                styleMask: [.titled, .closable, .miniaturizable],
-                backing: .buffered,
-                defer: false
-            )
-            
-            settingsWindow?.title = "Gopy Ayarları"
-            settingsWindow?.contentViewController = hostingController
-            settingsWindow?.center()
-            settingsWindow?.setFrameAutosaveName("SettingsWindow")
+
+    @objc func showPanel() {
+        guard let panel = floatingPanel else { return }
+
+        if let screen = NSScreen.main {
+            let screenFrame = screen.visibleFrame
+            let panelSize = panel.frame.size
+            let x = screenFrame.midX - panelSize.width / 2
+            let y = screenFrame.midY - panelSize.height / 2 + 60
+            panel.setFrameOrigin(NSPoint(x: x, y: y))
         }
-        
-        settingsWindow?.makeKeyAndOrderFront(nil)
+
+        panel.alphaValue = 0
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.18
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().alphaValue = 1
+        }
+
+        // Monitor clicks outside the panel
+        clickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            self?.hidePanel()
+        }
+    }
+
+    func hidePanel() {
+        guard let panel = floatingPanel, panel.isVisible else { return }
+
+        if let monitor = clickOutsideMonitor {
+            NSEvent.removeMonitor(monitor)
+            clickOutsideMonitor = nil
+        }
+
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.12
+            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            panel.animator().alphaValue = 0
+        }, completionHandler: {
+            panel.orderOut(nil)
+        })
+    }
+
+    @objc func showSettings() {
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
         NSApp.activate(ignoringOtherApps: true)
     }
-    
+
     @objc func quitApp() {
         NSApp.terminate(nil)
     }
-    
-    private func enableAutoLaunch() {
-        // This would normally use SMLoginItemSetEnabled or LaunchAtLogin package
-        // For now, we'll use a simple approach
-        let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.gopy.Gopy"
-        
-        // Create launch agent plist if it doesn't exist
-        let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
-        let launchAgentsPath = homeDirectory.appendingPathComponent("Library/LaunchAgents")
-        let plistPath = launchAgentsPath.appendingPathComponent("\(bundleIdentifier).plist")
-        
-        if !FileManager.default.fileExists(atPath: plistPath.path) {
-            do {
-                try FileManager.default.createDirectory(at: launchAgentsPath, withIntermediateDirectories: true)
-                
-                let appPath = Bundle.main.bundlePath
-                let plistContent = """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-                <plist version="1.0">
-                <dict>
-                    <key>Label</key>
-                    <string>\(bundleIdentifier)</string>
-                    <key>ProgramArguments</key>
-                    <array>
-                        <string>\(appPath)/Contents/MacOS/Gopy</string>
-                    </array>
-                    <key>RunAtLoad</key>
-                    <true/>
-                    <key>LSUIElement</key>
-                    <true/>
-                </dict>
-                </plist>
-                """
-                
-                try plistContent.write(to: plistPath, atomically: true, encoding: .utf8)
-            } catch {
-                print("Auto-launch kurulumu başarısız: \(error)")
-            }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if let hotKeyRef = hotKeyRef {
+            UnregisterEventHotKey(hotKeyRef)
         }
     }
-    
-    func applicationWillTerminate(_ notification: Notification) {
-        // Cleanup if needed
+}
+
+extension Notification.Name {
+    static let hidGopyPanel = Notification.Name("hidGopyPanel")
+}
+
+// MARK: - Floating Panel
+
+class FloatingPanel: NSPanel {
+
+    init(content: some View) {
+        super.init(
+            contentRect: NSRect(x: 0, y: 0, width: 580, height: 520),
+            styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+
+        isFloatingPanel = true
+        level = .floating
+        isMovableByWindowBackground = true
+        titlebarAppearsTransparent = true
+        titleVisibility = .hidden
+        backgroundColor = .clear
+        isOpaque = false
+        hasShadow = true
+        animationBehavior = .utilityWindow
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        isReleasedWhenClosed = false
+        becomesKeyOnlyIfNeeded = false
+
+        let hostingView = NSHostingView(rootView: content)
+        self.contentView = hostingView
     }
+
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 53 { // Escape
+            if let appDelegate = NSApp.delegate as? AppDelegate {
+                appDelegate.hidePanel()
+            }
+        } else {
+            super.keyDown(with: event)
+        }
+    }
+
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
 }

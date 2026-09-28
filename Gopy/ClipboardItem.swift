@@ -16,13 +16,14 @@ struct ClipboardItem: Identifiable, Codable {
     }
     
     enum CodingKeys: String, CodingKey {
-        case id, content, date, tags, isFavorite, note
+        case id, content, imageData, date, tags, isFavorite, note
     }
     
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
         try container.encode(content, forKey: .content)
+        try container.encode(_imageData, forKey: .imageData)
         try container.encode(date, forKey: .date)
         try container.encode(tags, forKey: .tags)
         try container.encode(isFavorite, forKey: .isFavorite)
@@ -33,20 +34,20 @@ struct ClipboardItem: Identifiable, Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         content = try container.decode(String?.self, forKey: .content)
+        _imageData = try container.decodeIfPresent(Data.self, forKey: .imageData)
         date = try container.decode(Date.self, forKey: .date)
         tags = try container.decode([String].self, forKey: .tags)
         isFavorite = try container.decode(Bool.self, forKey: .isFavorite)
         note = try container.decode(String?.self, forKey: .note)
-        _imageData = nil
     }
     
     var displayContent: String {
         if let content = content {
             return content
         } else if imageData != nil {
-            return "📷 Ekran Görüntüsü"
+            return "Screenshot"
         } else {
-            return "Boş İçerik"
+            return "Empty Content"
         }
     }
     
