@@ -22,11 +22,24 @@ rm -rf DerivedData/
 
 # Release build yap
 echo "🔨 Release build yapılıyor..."
+# Release, geliştirici sertifikası olmadan ad-hoc imzalanır: development
+# provisioning profile sadece kayıtlı cihazlarda açılır. App group izni
+# (widget için) profile gerektirdiğinden release'ten çıkarılır.
+mkdir -p build
+RELEASE_ENTITLEMENTS="$PWD/build/Release.entitlements"
+cp Gopy/Gopy.entitlements "$RELEASE_ENTITLEMENTS"
+/usr/libexec/PlistBuddy -c "Delete :com.apple.security.application-groups" "$RELEASE_ENTITLEMENTS" 2>/dev/null || true
+
 xcodebuild -project Gopy.xcodeproj \
     -scheme Gopy \
     -configuration Release \
     -derivedDataPath ./DerivedData \
     -archivePath ./build/Gopy.xcarchive \
+    CODE_SIGN_IDENTITY="-" \
+    CODE_SIGN_STYLE=Manual \
+    DEVELOPMENT_TEAM="" \
+    PROVISIONING_PROFILE_SPECIFIER="" \
+    CODE_SIGN_ENTITLEMENTS="$RELEASE_ENTITLEMENTS" \
     archive
 
 # Export edilen app'i kontrol et
